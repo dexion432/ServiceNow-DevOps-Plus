@@ -9,6 +9,8 @@
         <create_access>false</create_access>
         <create_access_controls>true</create_access_controls>
         <delete_access>false</delete_access>
+        <filter_extension/>
+        <is_df_table>false</is_df_table>
         <is_extendable>false</is_extendable>
         <label>Context Menu Item</label>
         <live_feed_enabled>false</live_feed_enabled>
@@ -17,15 +19,17 @@
         <provider_class/>
         <read_access>true</read_access>
         <scriptable_table>false</scriptable_table>
-        <super_class display_value="Application File" name="sys_metadata">0e1b3322f832021008dd9cfea425ac97</super_class>
+        <super_class display_value="Application File" name="sys_metadata">792271204f310200ecd5df601310c7da</super_class>
         <sys_class_name>sys_db_object</sys_class_name>
         <sys_created_by>admin</sys_created_by>
         <sys_created_on>2023-06-06 19:08:45</sys_created_on>
+        <sys_customer_update>false</sys_customer_update>
         <sys_id>e5ed078597172110d70ef207f053af3d</sys_id>
         <sys_mod_count>3</sys_mod_count>
         <sys_name>Context Menu Item</sys_name>
         <sys_package display_value="DevOps+" source="x_424426_devops">0b41a31b97cf2110d70ef207f053afb0</sys_package>
         <sys_policy/>
+        <sys_replace_on_upgrade>false</sys_replace_on_upgrade>
         <sys_scope display_value="DevOps+">0b41a31b97cf2110d70ef207f053afb0</sys_scope>
         <sys_update_name>sys_db_object_e5ed078597172110d70ef207f053af3d</sys_update_name>
         <sys_updated_by>admin</sys_updated_by>

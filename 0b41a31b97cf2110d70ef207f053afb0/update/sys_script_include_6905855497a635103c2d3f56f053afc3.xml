@@ -10,180 +10,12 @@
         <name>ConfigUtil</name>
         <sandbox_callable>false</sandbox_callable>
         <script><![CDATA[/* global gs, sn_cc */
-/* global Class, GlideRecord, GlideTableHierarchy, GlideStringUtil, GlideClientExtensionPoint */
+/* global Class, GlideRecordSecure */
 /* eslint no-undef: "error" */
 var ConfigUtil = Class.create();
 ConfigUtil.prototype = {
 	initialize: function() {
-		const appGr = new GlideRecord('sys_app');
-		appGr.addQuery('sys_id', '0b41a31b97cf2110d70ef207f053afb0');
-		appGr.setLimit(1);
-		appGr.query();
-		if (appGr.next()) {
-			this.version = appGr.getValue('version');
-		} else {
-			this.version = 'unknown';
-		}
 
-		this.isDevOpsUser = gs.hasRole('x_424426_devops.devops_user');
-
-		const user = gs.getUser();
-		this.preferences = {
-			show_context_menu: user.getPreference('devops_show_context_menu') == 'true',
-			hotkeys_enabled: user.getPreference('devops_hotkeys_enabled') == 'true',
-			add_scope_on_save: user.getPreference('devops_add_scope_on_save') == 'true',
-			show_hidden_fields: user.getPreference('devops_show_hidden_fields') == 'true'
-		};
-	},
-
-	/**
-	 * @param {object} [params]
-	 * @param {GlideAction} [params.action]
-	 * @param {GlideRecordGenerated} [params.record]
-	 * @param {RenderProperties} [params.renderProperties]
-	 */
-	getConfig: function (params) {
-		const action = params?.action;
-		const record = params?.record;
-		const renderProperties = params?.renderProperties;
-		if (gs.hasRole('x_424426_devops.devops_user')) {
-			const config = {
-				version: this.version,
-				preferences: this.preferences,
-				localization: getLocalizationData.call(this),
-				ui_scripts: new GlideClientExtensionPoint().getExtensions('DevOpsExt'),
-				env: getEnvData.call(this, action, renderProperties),
-				record: getRecordData.call(this, record),
-				context_menu: {
-					form_items: getFormContextMenuItems.call(this)
-				},
-				hidden_fields: getHiddenFieldData.call(this, record)
-			};
-
-			return config;
-		}
-
-		function getEnvData(action, rp) {
-			const env = {
-				action: (action || gs.action).getGlideURI().toString(),
-				current_application: gs.getCurrentApplicationId()
-			};
-
-			if (rp) {
-				env.is_dev_studio = rp.isInDevStudio();
-			}
-
-			return env;
-		}
-
-		function getLocalizationData() {
-			return {
-				deepl_support: this.hasDeeplSupport(),
-				languages: this.getLanguages()
-			};
-		}
-
-		/**
-		 * @param {GlideRecordGenerated} anyGr
-		 */
-		function getRecordData(anyGr) {
-			if (!anyGr) {
-				return null;
-			}
-
-			const klass = anyGr.getRecordClassName();
-			const record = {
-				klass: klass,
-				table: anyGr.getTableName(),
-				tables: new GlideTableHierarchy(klass).getTables(),
-				can_write: anyGr.canWrite(),
-				new_record: anyGr.isNewRecord()
-			};
-
-			// required for UI Action 'Show versions'
-			if (record.tables.includes('sys_metdata')) {
-				record.update_name = anyGr.sys_update_name.toString();
-				record.scope = anyGr.getValue('sys_scope');
-			}
-
-			return record;
-		}
-
-		function getFormContextMenuItems() {
-			if (!this.showContextMenu()) {
-				return null;
-			}
-
-			const itemGr = new GlideRecord('x_424426_devops_context_menu_item');
-			itemGr.addQuery('active', true);
-			itemGr.orderBy('order');
-			itemGr.query();
-
-			const headerItems = [];
-			const fieldItems = [];
-			const breadcrumbItems = [];
-			while (itemGr.next()) {
-				const item = {
-					label: itemGr.label.toString(),
-					script: itemGr.client_script.toString(),
-					condition_script: itemGr.use_condition ? itemGr.condition_script.toString() : '',
-					item_type: itemGr.item_type.toString()
-				};
-
-				if (itemGr.type == 'header') {
-					headerItems.push(item);
-				} else if (itemGr.type == 'field') {
-					fieldItems.push(item);
-				} else if (itemGr.type == 'breadcrumb') {
-					breadcrumbItems.push(item);
-				}
-			}
-
-			return {
-				header: headerItems,
-				field: fieldItems,
-				breadcrumb: breadcrumbItems
-			};
-		}
-
-		/**
-		 * @param {GlideRecordGeneerated} anyGr
-		 */
-		function getHiddenFieldData(anyGr) {
-			if (!anyGr || !this.preferences.show_hidden_fields) {
-				return null;
-			}
-
-			const tableToFields = JSON.parse(gs.getProperty('x_424426_devops.hidden_fields'));
-			const tables = new GlideTableHierarchy(anyGr.getRecordClassName()).getTables();
-			const hiddenFields = [];
-			for (let table in tableToFields) {
-				if (tables.includes(table)) {
-					tableToFields[table].forEach(fieldName => {
-						const fieldElement = record.getElement(fieldName);
-						if (fieldElement != null && fieldElement.canRead()) {
-							const field = {
-								name: fieldName,
-								label: fieldElement.getLabel(),
-								value: fieldElement.toString(),
-								display_value: fieldElement.getDisplayValue(),
-								type: fieldElement.getED().getInternalType()
-							};
-							
-							if (field.type == 'reference') {
-								field.table_name = fieldElement.getReferenceTable();
-							} else if (field.type == 'string') {
-								field.display_value = GlideStringUtil.newLinesToBreaks(field.display_value);
-							}
-							
-							hiddenFields.push(field);
-						}
-					});
-				}
-			}
-
-			return hiddenFields;
-		}
 	},
 
 	/**
@@ -191,7 +23,7 @@ ConfigUtil.prototype = {
 	 * @return {boolean}
 	 */
 	showContextMenu: function () {
-		return this.isDevOpsUser && this.preferences.show_context_menu;
+		return gs.hasRole('x_424426_devops.devops_user') && gs.getUser().getPreference('devops_show_context_menu') == 'true';
 	},
 	
 	/**
@@ -200,7 +32,7 @@ ConfigUtil.prototype = {
 	 */
 	hasDeeplSupport: function () {
 		const credentialsProvider = new sn_cc.StandardCredentialsProvider();
-		return credentialsProvider.getCredentials(['api_key'], ['x_424426_devops.deepl'])?.length > 0;
+		return !!credentialsProvider.getCredentials(['api_key'], ['x_424426_devops.deepl']);
 	},
 	
 	/**
@@ -209,7 +41,7 @@ ConfigUtil.prototype = {
 	 */
 	getLanguages: function () {
 		const languages = [];
-		const languageGr = new GlideRecord('sys_language');
+		const languageGr = new GlideRecordSecure('sys_language');
 		languageGr.addQuery('active', true);
 		languageGr.query();
 		while (languageGr.next()) {
@@ -227,25 +59,16 @@ ConfigUtil.prototype = {
         <sys_class_name>sys_script_include</sys_class_name>
         <sys_created_by>admin</sys_created_by>
         <sys_created_on>2023-11-12 14:34:45</sys_created_on>
+        <sys_customer_update>false</sys_customer_update>
         <sys_id>6905855497a635103c2d3f56f053afc3</sys_id>
-        <sys_mod_count>32</sys_mod_count>
+        <sys_mod_count>10</sys_mod_count>
         <sys_name>ConfigUtil</sys_name>
         <sys_package display_value="DevOps+" source="x_424426_devops">0b41a31b97cf2110d70ef207f053afb0</sys_package>
         <sys_policy/>
+        <sys_replace_on_upgrade>false</sys_replace_on_upgrade>
         <sys_scope display_value="DevOps+">0b41a31b97cf2110d70ef207f053afb0</sys_scope>
         <sys_update_name>sys_script_include_6905855497a635103c2d3f56f053afc3</sys_update_name>
         <sys_updated_by>markus.kraus</sys_updated_by>
-        <sys_updated_on>2025-01-31 12:55:14</sys_updated_on>
+        <sys_updated_on>2024-07-06 18:44:37</sys_updated_on>
     </sys_script_include>
-    <sys_es_latest_script action="INSERT_OR_UPDATE">
-        <id>6905855497a635103c2d3f56f053afc3</id>
-        <sys_created_by>markus.kraus</sys_created_by>
-        <sys_created_on>2024-11-27 17:39:07</sys_created_on>
-        <sys_id>a6357f3a838e12100971c810feaad3ba</sys_id>
-        <sys_mod_count>0</sys_mod_count>
-        <sys_updated_by>markus.kraus</sys_updated_by>
-        <sys_updated_on>2024-11-27 17:39:07</sys_updated_on>
-        <table>sys_script_include</table>
-        <use_es_latest>true</use_es_latest>
-    </sys_es_latest_script>
 </record_update>

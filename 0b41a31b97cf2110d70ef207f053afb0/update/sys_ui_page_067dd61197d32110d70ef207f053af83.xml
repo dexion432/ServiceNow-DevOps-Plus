@@ -27,26 +27,20 @@ addLoadEvent(function () {
 		searchScope.style.display = this.checked ? 'none' : '';
 	});
 	
-	var cancellationRequested = false;
-	//var canceled = false;
+	var canceled = false;
 	var cancelButton = document.querySelector('#progress-container a');
 	cancelButton.addEventListener('click', function () {
-		//canceled = true;
-		cancellationRequested = true;
-		cancelButton.setAttribute('disabled', '');
-		submitButton.setAttribute('disabled', '');
-		searchInput.setAttribute('disabled', '');
+		canceled = true;
 	});
 	
 	document.addEventListener('keyup', function (event) {
 		if (event.key == 'Escape') {
-			//canceled = true;
-			cancellationRequested = true;
+			canceled = true;
 		}
 	});
 	
 	document.getElementById('search-form').addEventListener('submit', function (event) {
-		//canceled = false;
+		canceled = false;
 		event.preventDefault();
 		
 		var fd = new FormData(this);
@@ -69,8 +63,7 @@ addLoadEvent(function () {
 			gel('progress-header').style.display = '';
 			
 			var configParams = {
-				term: term,
-				search_related: true
+				term: term
 			};
 
 			if (allScopes != 'on' && scope)
@@ -81,7 +74,6 @@ addLoadEvent(function () {
 			else
 				configParams.script = config;
 
-			gel('searchDetail').innerHTML = '(aquire config)';
 			getSearchConfig(configParams, function (config) {
 				if (config.tables.length) {
 					var i = 0;
@@ -98,19 +90,10 @@ addLoadEvent(function () {
 							addTable(result.tableLabel, result.hits, true, term);
 						}
 
-						if (i < config.tables.length && !cancellationRequested) {
+						if (i < config.tables.length && !canceled) {
 							searchTable(config.tables[i++], config.context, processTableResults, onError);
 						} else {
 							gel('progress-container').style.display = 'none';
-							gel('searchDetail').style.display = 'none';
-
-							if (cancellationRequested) {
-								submitButton.removeAttribute('disabled');
-								cancelButton.removeAttribute('disabled');
-								searchInput.removeAttribute('disabled');
-								//canceled = true;
-								cancellationRequested = false;
-							}
 						}
 					}, onError);
 				}
@@ -213,10 +196,7 @@ function addTable(tableName, hits, open, searchTerm) {
 			matchCode.classList.add('javascript', 'hljs');
 			
 			var lastLine = null;
-			match.lineMatches
-				.sort(function (a, b) { return a.line - b.line; })
-				.filter(function (match, pos, matches) { return matches.findIndex(m => m.line == match.line) == pos; })
-				.forEach(function (line) {
+			match.lineMatches.sort(function (a, b) { return a.line - b.line; }).forEach(function (line) {
 				if (lastLine && (lastLine < (line.line - 1))) {
 					matchCode.append(document.createElement('br'));
 				}
@@ -227,7 +207,7 @@ function addTable(tableName, hits, open, searchTerm) {
 				numSpan.innerHTML = 'Line ' + line.line;
 				
 				var contentSpan = document.createElement('span');
-				contentSpan.innerHTML = line.context.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;').replaceAll(searchTerm, function (part) { return '<strong>' + part + '</strong>'; });
+				contentSpan.innerHTML = line.context.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;').replace(new RegExp(searchTerm, 'g'), function (part) { return '<strong>' + part + '</strong>'; });
 				
 				lineSpan.append(numSpan, ': ', contentSpan, document.createElement('br'));
 				matchCode.append(lineSpan);
@@ -265,8 +245,6 @@ function getSearchConfig(params, onSuccess, onError) {
 }
 
 function searchTable(table, context, onSuccess, onError) {
-	gel('searchDetail').innerHTML = '(searching: ' + table + ')';
-
 	var ga = new GlideAjax('x_424426_devops.CodeSearchUtilClient');
 	ga.addParam('sysparm_name', 'searchTerm');
 	ga.addParam('table', table);
@@ -283,19 +261,15 @@ function searchTable(table, context, onSuccess, onError) {
 			}
 
 			window.console.error('[DevOps+] CodeSearchUtilClient::searchTable failed for table', table);
-			onSuccess({ tableLabel: table, hits: [] });
+			onSuccess([]);
 			return;
 		}
 
 		result = JSON.parse(result);
 		if (result.status == 'success') {
 			onSuccess(result.search_result);
-		} else if (result.missingHandlerMessage) {
-			GlideUI.get().addOutputMessage({ type: 'error', msg: result.missingHandlerMessage });
-			onSuccess({ tableLabel: table, hits: [] });
 		} else if (result.message) {
-			GlideUI.get().addOutputMessage({ type: 'error', msg: result.message });
-			onSuccess({ tableLabel: table, hits: [] });
+			onError(result.message);
 		} else {
 			onError();
 		}
@@ -381,7 +355,7 @@ function searchTable(table, context, onSuccess, onError) {
 	<div class="search-pane">
 		<div id="progress-header" style="display: none;">
 			<div id="progress-text" tabindex="0" aria-describedby="progress-text" role="heading" class="default-focus-outline">
-				<strong id="numResults"></strong>results for<strong id="searchTerm"></strong>in<strong id="searchedScope"></strong>$[SP]<span id="searchDetail"></span>
+				<strong id="numResults"></strong>results for<strong id="searchTerm"></strong>in<strong id="searchedScope"></strong>
 			</div>
 			<div id="progress-limit" style="display: none;">
 				<span class="error">
@@ -413,25 +387,16 @@ function searchTable(table, context, onSuccess, onError) {
         <sys_class_name>sys_ui_page</sys_class_name>
         <sys_created_by>admin</sys_created_by>
         <sys_created_on>2023-06-07 10:10:53</sys_created_on>
+        <sys_customer_update>false</sys_customer_update>
         <sys_id>067dd61197d32110d70ef207f053af83</sys_id>
-        <sys_mod_count>81</sys_mod_count>
+        <sys_mod_count>68</sys_mod_count>
         <sys_name>code_search</sys_name>
         <sys_package display_value="DevOps+" source="x_424426_devops">0b41a31b97cf2110d70ef207f053afb0</sys_package>
         <sys_policy/>
+        <sys_replace_on_upgrade>false</sys_replace_on_upgrade>
         <sys_scope display_value="DevOps+">0b41a31b97cf2110d70ef207f053afb0</sys_scope>
         <sys_update_name>sys_ui_page_067dd61197d32110d70ef207f053af83</sys_update_name>
         <sys_updated_by>markus.kraus</sys_updated_by>
-        <sys_updated_on>2024-11-27 20:16:53</sys_updated_on>
+        <sys_updated_on>2024-07-06 12:30:56</sys_updated_on>
     </sys_ui_page>
-    <sys_es_latest_script action="INSERT_OR_UPDATE">
-        <id>067dd61197d32110d70ef207f053af83</id>
-        <sys_created_by>markus.kraus</sys_created_by>
-        <sys_created_on>2024-11-04 13:40:06</sys_created_on>
-        <sys_id>95f1acef836d5e100971c810feaad30f</sys_id>
-        <sys_mod_count>0</sys_mod_count>
-        <sys_updated_by>markus.kraus</sys_updated_by>
-        <sys_updated_on>2024-11-04 13:40:06</sys_updated_on>
-        <table>sys_ui_page</table>
-        <use_es_latest>true</use_es_latest>
-    </sys_es_latest_script>
 </record_update>

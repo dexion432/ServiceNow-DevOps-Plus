@@ -7,13 +7,8 @@
 	
 	const functions = {};
 	try {
-		// when a class is created (instances) or inherited (extensions),
-		// the resulting object will store the prototype and needs to be stored,
-		// so the functions (which can be tested) can be extracted
 		const extensions = [];
 		const instances = [];
-
-		// provide the minimal "Class.create" interface
 		const klass = {
 			create: function () {
 				const obj = {};
@@ -25,7 +20,6 @@
 		const script = g_form.getValue('script');
 		const extendMatch = script.match(/Object\.extendsObject\((.+),/);
 		if (extendMatch) {
-			// provide a minimal, yet functional implementation for "Object.extendsObject"
 			const object = {
 				extendsObject: function (objA, objB) {
 					const dest = objA.prototype || {};
@@ -40,7 +34,6 @@
 
 			const extend = {};
 			let lastExtendObj = extend;
-			// the extending object is most likely not in this file, so a dummy implementation (extend) is provided
 			const path = extendMatch[1].split('.');
 			path.slice(1).forEach(obj => lastExtendObj = (lastExtendObj[obj] = {}));
 			new Function(path[0], 'Class', 'Object', script)(extend, klass, object);
@@ -84,8 +77,8 @@
 			}
 
 			testScript += _var + ' params = ' + JSON.stringify(paramConfig, null, 2) + ';\n';
-			testScript += _var + ' inst = new ' + apiName + '();\n';
-			testScript += 'inst.getParameter = function (paramName) { return (paramName in params) ? params[paramName] : null; };\n';
+			testScript += _var + ' inst = new ' + apiName + '()\n';
+			testScript += 'int.getParameter = function (paramName) { return (paramName in params) ? params[paramName] : null; };\n';
 		} else {
 			let initArgs = [];
 			parseParamNames(initFuncStr).forEach(name => {
@@ -113,7 +106,7 @@
 
 		const x = $context.event.screenX - 500;
 		const y = $context.event.screenY - 250;
-		const bgs = $context.window.open('sys.scripts.do?noredirect=true', 'DevOps+ Background Script', 'width=1000,height=550,top=' + y + ',left=' + x);
+		const bgs = $context.window.open('sys.scripts.do', 'DevOps+ Background Script', 'width=1000,height=550,top=' + y + ',left=' + x);
 		bgs.addEventListener('DOMContentLoaded', function () {
 			bgs.document.getElementById('runscript').value = testScript;
 
@@ -143,8 +136,7 @@
 /* eslint no-undef: "error" */
 (function () {
 	
-	var table = g_form.getTableName();
-	if (table == 'sys_script_include') {
+	if (g_form.getTableName() == 'sys_script_include') {
 		try {
 			const extensions = [];
 			const instances = [];
@@ -190,8 +182,6 @@
 		} catch (e) {
 			// only standard classes can be currently processed
 		}
-	} else if (table == 'sys_script') {
-		return true;
 	}
 
 	return false;
@@ -203,27 +193,18 @@
         <sys_class_name>x_424426_devops_context_menu_item</sys_class_name>
         <sys_created_by>markus.kraus</sys_created_by>
         <sys_created_on>2024-07-05 21:49:57</sys_created_on>
+        <sys_customer_update>false</sys_customer_update>
         <sys_id>4b100ad093d382101f07f5f08bba10d3</sys_id>
-        <sys_mod_count>36</sys_mod_count>
+        <sys_mod_count>32</sys_mod_count>
         <sys_name>test</sys_name>
         <sys_package display_value="DevOps+" source="x_424426_devops">0b41a31b97cf2110d70ef207f053afb0</sys_package>
         <sys_policy/>
+        <sys_replace_on_upgrade>false</sys_replace_on_upgrade>
         <sys_scope display_value="DevOps+">0b41a31b97cf2110d70ef207f053afb0</sys_scope>
         <sys_update_name>x_424426_devops_context_menu_item_4b100ad093d382101f07f5f08bba10d3</sys_update_name>
-        <sys_updated_by>admin</sys_updated_by>
-        <sys_updated_on>2025-02-12 09:51:02</sys_updated_on>
+        <sys_updated_by>markus.kraus</sys_updated_by>
+        <sys_updated_on>2024-07-08 08:40:11</sys_updated_on>
         <type>header</type>
         <use_condition>true</use_condition>
     </x_424426_devops_context_menu_item>
-    <sys_es_latest_script action="INSERT_OR_UPDATE">
-        <id>4b100ad093d382101f07f5f08bba10d3</id>
-        <sys_created_by>markus.kraus</sys_created_by>
-        <sys_created_on>2024-11-30 00:08:59</sys_created_on>
-        <sys_id>45a16ba383c6d2100971c810feaad361</sys_id>
-        <sys_mod_count>0</sys_mod_count>
-        <sys_updated_by>markus.kraus</sys_updated_by>
-        <sys_updated_on>2024-11-30 00:08:59</sys_updated_on>
-        <table>x_424426_devops_context_menu_item</table>
-        <use_es_latest>true</use_es_latest>
-    </sys_es_latest_script>
 </record_update>

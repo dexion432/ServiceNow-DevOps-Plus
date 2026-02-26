@@ -3,11 +3,14 @@
         <active>true</active>
         <application display_value="DevOps+">ae7ed61997d32110d70ef207f053af89</application>
         <assessment/>
+        <content_page/>
         <device_type/>
         <filter table="sys_ui_context_menu">parent=384fcd3197372110d70ef207f053afd6^active=true^EQ<item display_table="sys_ui_context_menu" display_value="DevOps+" endquery="false" field="parent" goto="false" newquery="false" operator="=" or="false" value="384fcd3197372110d70ef207f053afd6"/>
             <item endquery="false" field="active" goto="false" newquery="false" operator="=" or="false" value="true"/>
             <item endquery="true" field="" goto="false" newquery="false" operator="=" or="false" value=""/>
         </filter>
+        <help_hint/>
+        <help_link/>
         <hint/>
         <homepage/>
         <image/>
@@ -18,13 +21,17 @@
         <name>sys_ui_context_menu</name>
         <order>450</order>
         <override_menu_roles>false</override_menu_roles>
+        <populate_view/>
         <query/>
         <report/>
         <require_confirmation>false</require_confirmation>
         <roles/>
+        <survey/>
+        <survey_overwrite>false</survey_overwrite>
         <sys_class_name>sys_app_module</sys_class_name>
         <sys_created_by>markus.kraus</sys_created_by>
         <sys_created_on>2023-11-23 17:09:04</sys_created_on>
+        <sys_customer_update>false</sys_customer_update>
         <sys_domain>global</sys_domain>
         <sys_domain_path>/</sys_domain_path>
         <sys_id>57d1d27b97eabd103c2d3f56f053af63</sys_id>
@@ -33,6 +40,7 @@
         <sys_overrides/>
         <sys_package display_value="DevOps+" source="x_424426_devops">0b41a31b97cf2110d70ef207f053afb0</sys_package>
         <sys_policy/>
+        <sys_replace_on_upgrade>false</sys_replace_on_upgrade>
         <sys_scope display_value="DevOps+">0b41a31b97cf2110d70ef207f053afb0</sys_scope>
         <sys_update_name>sys_app_module_57d1d27b97eabd103c2d3f56f053af63</sys_update_name>
         <sys_updated_by>markus.kraus</sys_updated_by>

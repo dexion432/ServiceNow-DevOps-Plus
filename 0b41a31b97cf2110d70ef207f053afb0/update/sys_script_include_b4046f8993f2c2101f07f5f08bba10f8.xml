@@ -10,184 +10,105 @@
         <name>CodeSearchHandlerFlow</name>
         <sandbox_callable>false</sandbox_callable>
         <script><![CDATA[/* global global, gs, x_424426_devops */
-/* global Class, GlideRecord, Uint8Array */
+/* global Class, GlideRecordSecure, GlideStringUtil */
 /* eslint no-undef: "error" */
 var CodeSearchHandlerFlow = Class.create();
 CodeSearchHandlerFlow.prototype = Object.extendsObject(x_424426_devops.CodeSearchHandlerBase, {
     initialize: function() {
 		x_424426_devops.CodeSearchHandlerBase.prototype.initialize.apply(this, arguments);
-
-		this.relationships = {
-			sys_hub_flow: {
-				field: 'flow',
-				order: 'order',
-				tables: ['sys_hub_trigger_instance', 'sys_hub_trigger_instance_v2', 'sys_hub_action_instance']
-			},
-			sys_hub_action_type_definition: {
-				field: 'action',
-				order: 'order',
-				tables: ['sys_hub_step_instance', 'sys_hub_action_type_definition', 'sys_hub_input_scripts']
-			}
-		};
-
-		//this.jsLibs = new x_424426_devops.JSLibs();
-		this.npm = new x_424426_devops.NPM();
     },
 
-    handlesScope: function (scopeName) {
+     handlesScope: function (scopeName) {
 		return scopeName == 'global';
 	},
 
 	handlesTable: function (tableName) {
-		return tableName in this.relationships;
+		return tableName == 'sys_hub_flow';
 	},
 
-	/**
-	 * search in the supplied table using the (fixed) context
-	 * @param {string} table
-	 * @param {string} term
-	 * @param {{fields: Object<string, {type: string}>?, exact: boolean?, search_related: boolean?, additional_filter: string?, scope: string?, limit: number?, match_table: boolean?, }} [options]
-	 * @return {{tableLabel: string, hits: {name: string, className: string, matches: {fieldLabel: string, lineMatches: {line: number, context: string}[]}[], sysId: string}}}
-	 */
-	search: function (table, term, options) {
-        const fields = options?.fields || this.getFields(table);
-		let query = [];
-		if (options?.additional_filter)
-			query.push(options.additional_filter);
+	// context.{table|fields|term|additional_filter|scope|match_class|limit}
+	// => result.{tableLabel|hits}
+	// => result.hits{name|className|matches[]|sysId}
+	// => result.hits.matches[].{line|context}
+	search: function(table, context) {
+        const fields = context.all_fields ? this.getFields(table) : context.fields;
+        const term = GlideStringUtil.escapeQueryTermSeparator(context.term);
+		var query = [];
+		if (context.additional_filter)
+			query.push(context.additional_filter);
 
-		if (options?.scope)
-			query.push('sys_scope=' + options.scope);
+		if (context.scope)
+			query.push('sys_scope=' + context.scope);
 
-		if (options?.match_table)
+		if (context.match_table)
 			query.push('sys_class_name=' + table);
 
-		const hubGr = new GlideRecord(table);
+		const flowGr = new GlideRecordSecure('sys_hub_flow');
 		if (query.length)
-			hubGr.addEncodedQuery(query.join('^'));
+			flowGr.addEncodedQuery(query.join('^'));
 
-		const fieldQuery = [];
-		for (const field in fields) {
-			fieldQuery.push(field + (options?.exact ? '=' : 'LIKE') + term);
-		}
-
-		if (fieldQuery.length) {
-			hubGr.addEncodedQuery(fieldQuery.join('^OR'));
-		}
+		if (fields.length)
+			flowGr.addEncodedQuery(fields.map(f => f + 'LIKE' + term).join('^OR'));
 		
-		// with related search active, any match in a related record counts as a match for the parent record
-		// => we also have to search the whole table unconditionally as well
-		if (options?.search_related && query.length)
-			hubGr.addEncodedQuery('^NQ' + query.join('^'));
+		// related search must not contain the field conditions the term might be present in the fields but in the related records
+		if (context.search_related && query.length)
+			flowGr.addEncodedQuery('^NQ' + query.join('^'));
 
-		hubGr.orderBy('sys_class_name');
-		hubGr.orderBy('sys_name');
+		flowGr.orderBy('sys_class_name');
+		flowGr.orderBy('sys_name');
 
-		if (options?.limit) {
-			hubGr.setLimit(options.limit);
+		if (context.limit) {
+			flowGr.setLimit(context.limit);
 		}
 
-		hubGr.query();
+		flowGr.query();
 
 		const result = {
-			tableLabel: hubGr.getLabel(),
+			tableLabel: flowGr.getLabel(),
 			hits: []
 		};
 
-		//const Base64 = this.jsLibs.require('Base64');
-		//const gzip = this.jsLibs.require('gzip');
-		const Base64 = this.npm.require('js-base64');
-		const gzip = this.npm.require('gzip-js');
-
-		while (hubGr.next()) {
+		while (flowGr.next()) {
 			const hit = {
-				name: hubGr.getDisplayValue() || hubGr.getUniqueValue(),
-				className: hubGr.getRecordClassName(),
-				matches: this.getMatches(hubGr, fields, term),
-				sysId: hubGr.getUniqueValue()
+				name: flowGr.getDisplayValue() || flowGr.getUniqueValue(),
+				className: flowGr.getRecordClassName(),
+				matches: this.getMatches(flowGr, fields, context.term),
+				sysId: flowGr.getUniqueValue()
 			};
 
-			if (options?.search_related) {
-				const relConfig = this.relationships[table];
-				relConfig.tables.forEach(relatedTable => {
-					const relGr = new GlideRecord(relatedTable);
-					relGr.addQuery(relConfig.field, hubGr.sys_id);
-					relGr.orderBy(relConfig.order);
-					relGr.query();
-					while (relGr.next()) {
-						const variableGr = new GlideRecord('sys_variable_value');
-						variableGr.addQuery('document', relatedTable);
-						variableGr.addQuery('document_key', relGr.sys_id);
-						variableGr.addQuery('value', 'CONTAINS', term);
-						variableGr.query();
-						while (variableGr.next()) {
-							hit.matches.push(...this.getMatches(variableGr, { value: null }, term));
-						}
-					}
-				});
-
-				if (relConfig.field == 'flow') {
-					const instGr = new GlideRecord('sys_hub_action_instance_v2');
-					instGr.addQuery('flow', hubGr.sys_id);
-					instGr.addNotNullQuery('values');
-					instGr.orderBy('order');
-					instGr.query();
-					while (instGr.next()) {
-						const data = Base64.atob(instGr.values.toString()).split('').map(x => x.charCodeAt(0));
-						const bytes = new Uint8Array(data);
-						const decompressed = new Uint8Array(gzip.unzip(bytes));
-						const valueBase64 = Base64.fromUint8Array(decompressed);
-						const valueDecoded = gs.base64Decode(valueBase64);
-						const match = {
-							fieldLabel: 'Value',
-							lineMatches: this.getMatchingLines(valueDecoded, term)
-						};
-
-						match.lineMatches.forEach(lineMatch => {
-							if (lineMatch.context.length > this.max_context_length) {
-								lineMatch.context = lineMatch.context.substring(0, this.max_context_length) + '...';
-							}
-						});
-
-						if (match.lineMatches.length) {
-							hit.matches.push(match);
-						}
-					}
-				} else if (relConfig.field == 'action') {
-					const varGr = new GlideRecord('sys_variable_value');
-					varGr.addQuery('document', table);
-					varGr.addQuery('document_key', hubGr.sys_id);
-					varGr.addQuery('value', 'CONTAINS', term);
-					varGr.query();
-					while (varGr.next()) {
-						hit.matches.push(...this.getMatches(varGr, { value: null }, term));
-					}
-
-					var outputGr = new GlideRecord('sys_hub_action_output');
-					outputGr.addQuery('model', hubGr.sys_id);
-					outputGr.orderBy('order');
-					outputGr.query();
-					while (outputGr.next()) {
-						const scriptGr = new GlideRecord('sys_hub_input_scripts');
-						scriptGr.addQuery('active', true);
-						scriptGr.addQuery('instance', outputGr.sys_id);
-						scriptGr.addQuery('script', 'CONTAINS', term);
-						scriptGr.query();
-						while (scriptGr.next()) {
-							hit.matches.push(...this.getMatches(scriptGr, { script: null }, term));
-						}
+			if (context.search_related) {
+				const flowTriggerGr = new GlideRecordSecure('sys_hub_trigger_instance');
+				flowTriggerGr.addQuery('flow', flowGr.sys_id);
+				flowTriggerGr.query();
+				while (flowTriggerGr.next()) {
+					const variableGr = new GlideRecordSecure('sys_variable_value');
+					variableGr.addQuery('document', 'sys_hub_trigger_instance');
+					variableGr.addQuery('document_key', flowTriggerGr.sys_id);
+					variableGr.addQuery('value', 'CONTAINS', context.term);
+					variableGr.query();
+					while (variableGr.next()) {
+						hit.matches = hit.matches.concat(
+							this.getMatches(variableGr, ['value'], context.term)
+						);
 					}
 				}
-			}
 
-			if (!options?.search_related && hit.matches.length == 0) {
-				// getMatches sometimes isn't able to do text matches which have been detected by the query
-				hit.matches.push({
-					fieldLabel: '(Fallback)',
-					lineMatches: [{
-						line: 1,
-						context: term
-					}]
-				});
+				const actionInstanceGr = new GlideRecordSecure('sys_hub_action_instance');
+				actionInstanceGr.addQuery('flow', flowGr.sys_id);
+				actionInstanceGr.orderBy('order');
+				actionInstanceGr.query();
+				while (actionInstanceGr.next()) {
+					const variableGr = new GlideRecordSecure('sys_variable_value');
+					variableGr.addQuery('document', 'sys_hub_action_instance');
+					variableGr.addQuery('document_key', flowTriggerGr.sys_id);
+					variableGr.addQuery('value', 'CONTAINS', context.term);
+					variableGr.query();
+					while (variableGr.next()) {
+						hit.matches = hit.matches.concat(
+							this.getMatches(variableGr, ['value'], context.term)
+						);
+					}
+				}
 			}
 
 			if (hit.matches.length) {
@@ -203,25 +124,16 @@ CodeSearchHandlerFlow.prototype = Object.extendsObject(x_424426_devops.CodeSearc
         <sys_class_name>sys_script_include</sys_class_name>
         <sys_created_by>markus.kraus</sys_created_by>
         <sys_created_on>2024-06-13 16:30:28</sys_created_on>
+        <sys_customer_update>false</sys_customer_update>
         <sys_id>b4046f8993f2c2101f07f5f08bba10f8</sys_id>
-        <sys_mod_count>31</sys_mod_count>
+        <sys_mod_count>2</sys_mod_count>
         <sys_name>CodeSearchHandlerFlow</sys_name>
         <sys_package display_value="DevOps+" source="x_424426_devops">0b41a31b97cf2110d70ef207f053afb0</sys_package>
         <sys_policy/>
+        <sys_replace_on_upgrade>false</sys_replace_on_upgrade>
         <sys_scope display_value="DevOps+">0b41a31b97cf2110d70ef207f053afb0</sys_scope>
         <sys_update_name>sys_script_include_b4046f8993f2c2101f07f5f08bba10f8</sys_update_name>
-        <sys_updated_by>markus.kraus</sys_updated_by>
-        <sys_updated_on>2025-01-31 16:27:42</sys_updated_on>
+        <sys_updated_by>Keri.Csaba</sys_updated_by>
+        <sys_updated_on>2026-02-26 10:03:09</sys_updated_on>
     </sys_script_include>
-    <sys_es_latest_script action="INSERT_OR_UPDATE">
-        <id>b4046f8993f2c2101f07f5f08bba10f8</id>
-        <sys_created_by>markus.kraus</sys_created_by>
-        <sys_created_on>2024-11-07 11:49:06</sys_created_on>
-        <sys_id>24556fd4837116900971c810feaad341</sys_id>
-        <sys_mod_count>0</sys_mod_count>
-        <sys_updated_by>markus.kraus</sys_updated_by>
-        <sys_updated_on>2024-11-07 11:49:06</sys_updated_on>
-        <table>sys_script_include</table>
-        <use_es_latest>true</use_es_latest>
-    </sys_es_latest_script>
 </record_update>

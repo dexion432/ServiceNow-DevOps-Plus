@@ -10,7 +10,30 @@
         <name>CodeSearchHandlerBase</name>
         <sandbox_callable>false</sandbox_callable>
         <script><![CDATA[var CodeSearchHandlerBase = Class.create();
-CodeSearchHandlerBase.prototype = {	
+CodeSearchHandlerBase.prototype = {
+	/**
+	 * @typedef {CodeSearchContext}
+	 * @property {string} term - the search term
+	 * @property {Array.<string>} [fields] - if all_fields is not set contains the list of fields to be searched
+	 * @property {boolean} [all_fields] - wether all fields shoud be searched
+	 * @property {string} [additional_filter] - encoded query which should be added on top of the search query
+	 * @property {string} [scope] - limit search to the supplied scope
+	 * @property {boolean} [match_table] - match sys_class_name aka do not search extending tables
+	 * @property {number} limit - search limit
+	 */
+	/**
+	 * @typedef {CodeSearchHit}
+	 * @property {string} name
+	 * @property {string} className
+	 * @property {Array.<CodeSearchMatch>} matches
+	 * @property {string} sysId
+	 */
+	/**
+	 * @typedef {CodeSearchResult}
+	 * @property {string} tableLabel
+	 * @property {Array.<CodeSearchHit>} hits
+	 */
+	
 	initialize: function() {
 		this.max_context_length = 500;
 	},
@@ -19,19 +42,15 @@ CodeSearchHandlerBase.prototype = {
 	 * get all searchable fields for the given table
 	 * note: the result is cached
 	 * @param {string} table - the table name
-	 * @return {Object<string, {name: string, table: string, type: string, label: string, reference: string}>}
+	 * @return {Array.<string>}
 	 */
 	getFields: function (table) {
-		let cachedFields = sn_scoped_cache.ScopedCacheManager.get('devops_plus_code_search_columns', table);
+		var cachedFields = sn_scoped_cache.ScopedCacheManager.get('devops_plus_code_search_columns', table);
 		if (cachedFields) {
-			if (cachedFields.startsWith('{')) {
-				// DevOps+ > 1.2.3 stores the field info!
-				// by checking for an actual object, we ensure that 1.2.3-caches get updated
-				return JSON.parse(cachedFields);
-			}
+			return JSON.parse(cachedFields);
 		}
 		
-		const fields = {};
+		const fields = [];
 		const dictionaryGr = new GlideRecordSecure('sys_dictionary');
 		dictionaryGr.addQuery('name', 'IN', new GlideTableHierarchy(table).getTables());
 		dictionaryGr.addQuery('internal_type.scalar_type', 'string');
@@ -39,30 +58,29 @@ CodeSearchHandlerBase.prototype = {
 		dictionaryGr.addQuery('internal_type.name', '!=', 'glide_var');
 		dictionaryGr.query();
 		while (dictionaryGr.next()) {
-			const name = dictionaryGr.element.toString();
-			fields[name] = {
-				name: name,
-				table: dictionaryGr.name.toString(),
-				type: dictionaryGr.internal_type.name.toString(),
-				reference: dictionaryGr.reference.toString(),
-				max_length: +dictionaryGr.max_length
-			};
+			const fieldName = dictionaryGr.element.toString();
+			if (!fields.includes(fieldName)) {
+				fields.push(fieldName);
+			}
 		}
 		
 		sn_scoped_cache.ScopedCacheManager.put('devops_plus_code_search_columns', table, JSON.stringify(fields));
 		return fields;
 	},
-	
+
+	/**
+	 * @typedef {{ fieldLabel: string, lineMatches: Array.<LineMatch> }} CodeSearchMatch
+	 */
 	/**
 	 * get all matches of the supplied search term
 	 * @param {GlideRecordGenerated} anyGr
-	 * @param {Object<string, {}} fields
+	 * @param {Array.<string>} fields
 	 * @param {string} term
-	 * @return {{fieldLabel: string, lineMatches: {line: number, context: string}[]}[]}
+	 * @return {Array.<CodeSearchMatch>}
 	 */
 	getMatches: function (anyGr, fields, term) {
 		const matches = [];
-		for (const field in fields) {
+		fields.forEach(field => {
 			const element = anyGr.getElement(field);
 			if (element) {
 				const match = {
@@ -80,23 +98,28 @@ CodeSearchHandlerBase.prototype = {
 					matches.push(match);
 				}
 			}
-		}
+		});
 
 		return matches;
 	},
-	
+
+	/**
+	 * @typedef {Object} LineMatch
+	 * @property {number} line - the line number in which the match occurred
+	 * @property {string} context - the line and the surrounding lines for visualisation on the result page
+	 */
 	/**
 	 * get matching lines of the supplied term within the supplied text
 	 * @param {string} text
 	 * @param {string} term
-	 * @return {{line: number, context: string}[]}
+	 * @return {Array.<LineMatch>}
 	 */
 	getMatchingLines: function (text, term) {
 		const lineMatches = [];
-		let scanProgress = 0;
+		var scanProgress = 0;
 		const lines = text.split(/\r\n|\r|\n/g);
-		for (let j = 0; j < lines.length; j++) {
-			const line = lines[j];
+		for (var j = 0; j < lines.length; j++) {
+			var line = lines[j];
 			if (line.toLowerCase().includes(term.toLowerCase())) {
 				if (j > 0 && j > scanProgress + 1) {
 					lineMatches.push({line: (j), context: lines[j - 1]});
@@ -115,30 +138,21 @@ CodeSearchHandlerBase.prototype = {
 		return lineMatches;
 	},
 
-	type: 'CodeSearchHandlerBase'
+    type: 'CodeSearchHandlerBase'
 };]]></script>
         <sys_class_name>sys_script_include</sys_class_name>
         <sys_created_by>markus.kraus</sys_created_by>
         <sys_created_on>2024-06-12 05:14:02</sys_created_on>
+        <sys_customer_update>false</sys_customer_update>
         <sys_id>725f73a493b242101f07f5f08bba10ec</sys_id>
-        <sys_mod_count>25</sys_mod_count>
+        <sys_mod_count>22</sys_mod_count>
         <sys_name>CodeSearchHandlerBase</sys_name>
         <sys_package display_value="DevOps+" source="x_424426_devops">0b41a31b97cf2110d70ef207f053afb0</sys_package>
         <sys_policy/>
+        <sys_replace_on_upgrade>false</sys_replace_on_upgrade>
         <sys_scope display_value="DevOps+">0b41a31b97cf2110d70ef207f053afb0</sys_scope>
         <sys_update_name>sys_script_include_725f73a493b242101f07f5f08bba10ec</sys_update_name>
-        <sys_updated_by>markus.kraus</sys_updated_by>
-        <sys_updated_on>2024-11-07 12:59:27</sys_updated_on>
+        <sys_updated_by>Keri.Csaba</sys_updated_by>
+        <sys_updated_on>2026-02-26 10:03:29</sys_updated_on>
     </sys_script_include>
-    <sys_es_latest_script action="INSERT_OR_UPDATE">
-        <id>725f73a493b242101f07f5f08bba10ec</id>
-        <sys_created_by>markus.kraus</sys_created_by>
-        <sys_created_on>2024-11-07 11:30:34</sys_created_on>
-        <sys_id>81112b9483bdd2900971c810feaad3a8</sys_id>
-        <sys_mod_count>0</sys_mod_count>
-        <sys_updated_by>markus.kraus</sys_updated_by>
-        <sys_updated_on>2024-11-07 11:30:34</sys_updated_on>
-        <table>sys_script_include</table>
-        <use_es_latest>true</use_es_latest>
-    </sys_es_latest_script>
 </record_update>
